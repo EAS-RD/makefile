@@ -32,12 +32,13 @@ cmdControl "D" "tar -xzf makonvert.tar.gz"
 rm makonvert.tar.gz
 
 # Creates the necessary files
+cmdControl "R" "mv org.eclipse.cdt.core.prefs .settings/org.eclipse.cdt.core.prefs"
 cmdControl "C" "echo \"1\" > rev-number.txt"
 cmdControl "C" "echo \"1.0.0\" > vers-number.txt"
 
 # Adapts the files to the project
 cmdControl "R" "mv template.doxyfile ${1}.doxyfile"
-find . -type f -exec sed -i 's/xTemplatex/${1}/g' '{}' +
+find . -type f -exec sed -i "s/xTemplatex/${1}/g" '{}' +
 
 rm makonvert.sh
 
