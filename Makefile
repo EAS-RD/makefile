@@ -27,12 +27,12 @@
 ## \def COLOR
 ## \brief Sets the escape command to display messages in color.
 ##
-COLOR := "\\033[42m"
+COLOR ?= "\\033[42m"
 
 ## \def END_COLOR
 ## \brief Sets the escape command to complete the colorization.
 ##
-END_COLOR := "\\033[0m"
+END_COLOR ?= "\\033[0m"
 
 ## \mainpage Generic Makefile
 ##
@@ -116,14 +116,14 @@ END_COLOR := "\\033[0m"
 ## \brief Defines the project name. This name must match the name of the
 ##  project's parent directory in the workspace.
 ##
-PROJECT_NAME := makef
+PROJECT_NAME := makefile
 
 ## \def DEPENDENCIES
 ## \brief Sets the name of libraries whose binary depends.
 ##  These libraries must be in a path of the LD_LIBRARY_PATH variable, in the
 ##  system default directories, or in workspace.
 ##
-DEPENDENCIES :=
+DEPENDENCIES := common
 
 ## \def TEST_DEPENDENCIES
 ## \brief Sets the name of libraries whose unit testing depends.
@@ -148,7 +148,7 @@ TEST_LIB_DIR ?=
 ## \brief Defines the type of binary generated. Authorized values are
 ##  'exe' (by default), 'lib', or 'shared'
 ##
-BINARY_TYPE ?= exe
+BINARY_TYPE ?= shared
 
 ## @}
 ##
@@ -221,9 +221,17 @@ BUILD_VERSION ?= 0
 
 ## \def REV_NUMBER_FILE
 ## \brief Sets the filename containing the revision number. This filename
-##  is 'rev-number.txt'
+##  is 'rev-number.txt' by default
 ##
 REV_NUMBER_FILE = $(PROJECT_DIR)/rev-number.txt
+
+## \def VERS_NUMBER_FILE
+## \brief Sets the filename containing the version number. This filename
+##  is 'vers-number.txt' by default. It contains the version number in the
+##  form x.y.z where x is the major version, y the minor version and z the
+##  build version.
+##
+VERS_NUMBER_FILE = $(PROJECT_DIR)/vers-number.txt
 
 ## \def TEST_LIB
 ## \brief Sets the name of the unit test library.
@@ -283,11 +291,26 @@ endif
 # ---------------------------
 # SETS PROJECT SUBDIRECTORIES
 # ---------------------------
+## \def BIN_DIR_NAME
+## \brief Sets directory name where binary files are stored
+##
 BIN_DIR_NAME := build
+## \def SRC_DIR_NAME
+## \brief Sets directory name where source files are stored
+##
 SRC_DIR_NAME := src
+## \def INC_DIR_NAME
+## \brief Sets directory name where header files are stored
+##
 INC_DIR_NAME := include
+## \def LOG_DIR_NAME
+## \brief Sets directory name where log files are stored
+##
 LOG_DIR_NAME := log
-TEST_DIR_NAME:= test
+## \def TEST_DIR_NAME
+## \brief Sets directory name where testing source files are stored
+##
+TEST_DIR_NAME := test
 
 ## \def PROJECT_DIR
 ## \brief Reads actual directory corresponding to project name
@@ -341,18 +364,31 @@ OBJ_DIR := $(BIN_DIR)/$(CONFIG)_$(TARGET_ARCH)
 ##
 LOG_DIR := ${LOG_DIR_NAME}
 
-# ---------------------
-# READS REVISION NUMBER
-# ---------------------
+# ----------------------------------
+# READS REVISION AND VERSION NUMBERS
+# ----------------------------------
 ## \def REV_NUMBER
 ## \brief Contains the revision number. This number is read from REV_NUMBER_FILE.
 ##
 REV_NUMBER := $(shell cat $(REV_NUMBER_FILE))
 
+## \def VERS_NUMBER
+## \brief Contains the version number. This number is read from VERS_NUMBER_FILE.
+##
+ifneq ("$(wildcard $(VERS_NUMBER_FILE))","")
+  VERS_NUMBER := $(shell cat $(VERS_NUMBER_FILE))
+  DUMMY_VAR := $(subst ., ,$(VERS_NUMBER))
+
+  MAJ_VERSION := $(word 1, $(DUMMY_VAR))
+  MIN_VERSION := $(word 2, $(DUMMY_VAR))
+  BUILD_VERSION := $(word 3, $(DUMMY_VAR))
+endif
+
+
 # -----------------
 # FIND SOURCE FILES
 # -----------------
-#Fonction non utilisée
+# Not Used function
 define find_source
 $(eval FOUND_SRC = "") ;
 $(eval SEARCH_DIR = ${SRC_DIR}) ;
@@ -616,27 +652,7 @@ endif
 ## @}
 ##
 #-------------------------------------------------------------------------------
-ifeq ($(MAKECMDGOALS),all)
-DUMMY_VAR := $(shell	echo "$(COLOR)--> Creates missing directories$(END_COLOR)")
-DUMMY_VAR := $(shell mkdir -p $(OBJ_DIR))
-DUMMY_VAR := $(shell mkdir -p $(LOG_DIR))
-DUMMY_VAR := $(shell for i in ${SRC_SUBDIR} ; do mkdir -p $(OBJ_DIR)/$(SRC_DIR_NAME)/$$i ; done)
-DUMMY_VAR := $(shell mkdir -p $(OBJ_DIR)/$(TEST_DIR_NAME))
-endif
-
 vpath %.h $(SRC_DIR) $(INC_DIR) $(TEST_DIR) $(INCLUDE_DIR)
-
-# Compilation rules
-define make_dep_target
-$(OBJ_DIR)/$(SRC_DIR_NAME)/$(1)/%.d: $(SRC_DIR)/$(1)/%.c
-	@echo "$(COLOR)--> Creates dependencies files (1) for $<$(END_COLOR)"
-	$(CXX) -MM -MG $< | sed -e "s@^\(.*\)\.o:@\$(OBJ_DIR)/$(SRC_DIR_NAME)/$(1)/\1.o:@" > $@
-$(OBJ_DIR)/$(SRC_DIR_NAME)/$(1)/%.d: $(SRC_DIR)/$(1)/%.cpp
-	@echo "$(COLOR)--> Creates dependencies files (2) for $<$(END_COLOR)"
-	$(CXX) -MM -MG $< | sed -e "s@^\(.*\)\.o:@\$(OBJ_DIR)/$(SRC_DIR_NAME)/$(1)/\1.o:@" > $@
-endef
-
-#$(foreach dep,$(SRC_SUBDIR), $(call make_dep_target,$(dep)))
 
 without_target: help
 
@@ -753,6 +769,7 @@ display_config: #= Display configuration variables
 	@echo "* LOCAL_ARCH=$(LOCAL_ARCH)"
 	@echo "* TYPE_SUFFIX=$(TYPE_SUFFIX)"
 	@echo "* INCLUDE=$(INCLUDE)"
+	@echo "* VERSION=$(MAJ_VERSION).$(MIN_VERSION).$(BUILD_VERSION)"
 	@echo "* REV_NUMBER=$(REV_NUMBER)"
 
 clear_tarball: #= Clear all packages
@@ -772,10 +789,18 @@ help: $(MAKEFILE_LIST) #= This help message
 	@echo 
 
 ifeq ($(MAKECMDGOALS),all)
-# Includes dependencies
--include $(DEP_FILES)
-# Includes revision number rules.
-include revnumber.mak
+  $(info --> Creates missing directories)
+#  $(shell echo $(COLOR)--> Creates missing directories$(END_COLOR))
+  $(shell mkdir -p $(OBJ_DIR))
+  $(shell mkdir -p $(LOG_DIR))
+  $(shell mkdir -p $(OBJ_DIR)/$(SRC_DIR_NAME))
+  $(shell for i in ${SRC_SUBDIR} ; do mkdir -p $(OBJ_DIR)/$(SRC_DIR_NAME)/$$i ; done)
+  $(shell mkdir -p $(OBJ_DIR)/$(TEST_DIR_NAME))
+#  DUMMY_VAR := $(error erreur)
+  # Includes dependencies
+  -include $(DEP_FILES)
+  # Includes revision number rules.
+  include revnumber.mak
 endif
 
 ##
