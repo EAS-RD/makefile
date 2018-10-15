@@ -1,9 +1,17 @@
 ## *****************************************************************************
 ## **                                                                         **
-## **                     Copyright (c) 2018 by Tuxin                         **
-## **                         All Rights Reserved                             **
+## **                     Copyright (c) 2018 by Tuxin                            **
+## **   Licensed under the Apache License, Version 2.0 (the "License");       **
+## **   you may not use this file except in compliance with the License.      **
+## **   You may obtain a copy of the License at                               **                                                   
+## **       http://www.apache.org/licenses/LICENSE-2.0                        **
 ## **                                                                         **
-## **                     Version 1.0.0   April 25, 2018                      **
+## **   Unless required by applicable law or agreed to in writing, software   **
+## **   distributed under the License is distributed on an "AS IS" BASIS,     **
+## **   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or       **
+## **   implied.                                                              **
+## **   See the License for the specific language governing permissions and   **
+## **   limitations under the License.                                        **
 ## **                                                                         **
 ## *****************************************************************************
 ## *****************************************************************************
@@ -14,15 +22,15 @@
 ##              the files of a project, provided that it respects a pre-defined
 ##              directory architecture.
 ##
-## @author      Tuxin (Jean-Pierre)
+## @author      Tuxin (JPB)
 ## @version     1.0.0
 ## @since       Created 04/25/2018 (JPB)
 ## @date        April 25, 2018
 ##
 ## *****************************************************************************
 .DEFAULT_GOAL = without_target
-.PHONY: mrproper clean create_distribution without_target \
-        clear_tarball finalize display_config help 
+.PHONY: mrproper clean create_distribution without_target dependencies \
+        clear_tarball finalize display_config help create_directories
 
 ## \def COLOR
 ## \brief Sets the escape command to display messages in color.
@@ -332,6 +340,7 @@ SRC_DIR := ${SRC_DIR_NAME}
 ## \brief Defines the sub-directories of sources
 ##
 SRC_SUBDIR := $(shell cd $(SRC_DIR) && ls -d */ 2>/dev/null)
+DUMMY_VAR := $(info $(SRC_SUBDIR))
 
 ## \def TEST_DIR
 ## \brief Defines the parent directory of unit testing sources
@@ -526,12 +535,19 @@ CXXFLAGS = $(COMPIL_FLAGS) -std=gnu++11
 ##
 LDFLAGS = $(COMMON_FLAGS) -Xlinker --gc-sections -Wl,-Map,"$(LOG_DIR)/$(PROJECT_NAME)$(TYPE_SUFFIX)-$(VERSION).map"
 
+## \def DEP_LIB_PATH
+## \brief Variable used to define the contents of LD_LIBRARY_PATH ('dependencies' rule)
+##
+DEP_LIB_PATH:=
+
 ifneq ($(LIB_DIR),)
   $(foreach lib_dir,$(LIB_DIR),$(eval LDFLAGS+=-L$(lib_dir)))
+  $(foreach lib_dir,$(LIB_DIR),$(eval DEP_LIB_PATH:=$(DEP_LIB_PATH):$(lib_dir)))
 endif
 
 ifneq ($(TEST_LIB_DIR),)
   $(foreach lib_dir,$(TEST_LIB_DIR),$(eval LDFLAGS+=-L$(lib_dir)))
+  $(foreach lib_dir,$(LIB_DIR),$(eval DEP_LIB_PATH:=$(DEP_LIB_PATH):$(lib_dir)))
 endif
 
 ifneq ($(findstring pthread, $(DEPENDENCIES)),)
@@ -609,11 +625,12 @@ $(if $(or $(wildcard $(DEFAULT_DIR)/*.h*), \
 
 $(eval CUR_LIB_PATH = $(WORKSPACE_DIR)/$(1)/$(BIN_DIR_NAME)/$(DEP_CONFIG)_$(TARGET_ARCH));
 # TODO : Gérer les librairies avec le préfixe déjà ajouté
-$(eval CUR_LIB = $(LIB_PREFIX)$(1));
+$(eval CUR_LIB = $(LIB_PREFIX)$(1)$(TYPE_SUFFIX));
 $(if $(or $(wildcard $(CUR_LIB_PATH)/$(CUR_LIB).$(LIB_EXT)*), \
           $(wildcard $(CUR_LIB_PATH)/$(CUR_LIB).$(SHARED_EXT)*), \
           $(NOT_EXIST)), \
-              $(eval LDFLAGS += -l$(1)),);
+              $(eval LDFLAGS += -L$(CUR_LIB_PATH) -l$(1)); \
+              $(eval DEP_LIB_PATH:=$(DEP_LIB_PATH):$(CUR_LIB_PATH)),);           
 endef
 
 $(foreach lib,$(DEPENDENCIES),$(call find_dependency,$(lib)))
@@ -721,6 +738,11 @@ else
 	@cd $(OBJ_DIR) && tar --exclude=*.o -zcf ../${TARBALL_NAME} $(BINARY_PREFIX)$(PROJECT_NAME)$(TYPE_SUFFIX)*
 	@cd $(PROJECT_DIR)
 endif
+
+dependencies:
+	@echo "$(COLOR)--> Génération du fichier $(PROJECT_NAME).dep$(END_COLOR)"
+	@echo "export LD_LIBRARY_PATH=$$\c" > $(PROJECT_DIR)/$(PROJECT_NAME).dep
+	@echo "{LD_LIBRARY_PATH}$(DEP_LIB_PATH)" >> $(PROJECT_DIR)/$(PROJECT_NAME).dep
 
 display_config: #= Display configuration variables
 	@echo $(COLOR)Directories list$(END_COLOR)
