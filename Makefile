@@ -328,8 +328,7 @@ PROJECT_DIR := ${PWD}
 ## \def WORKSPACE_DIR
 ## \brief Defines Workspace directory
 ##
-WORKSPACE_DIR := $(dir ${PROJECT_DIR})
- WORKSPACE_DIR:= $(WORKSPACE_DIR:/=)
+WORKSPACE_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 
 ## \def SRC_DIR
 ## \brief Defines the parent directory of sources
@@ -606,31 +605,35 @@ endef
 # gcc flags generating for include files and libraries
 define find_dependency
 $(eval DEFAULT_DIR := ../$(1)/$(SRC_DIR_NAME)/$(INC_DIR_NAME));
-$(eval NOT_EXIST = 1);
+$(eval SUFFIX :=);
+$(eval NOT_IN_WORKSPACE = 1);
 $(if $(wildcard $(DEFAULT_DIR)/*.h*), $(eval INCLUDE += -I$(DEFAULT_DIR)); \
                                       $(eval INCLUDE_DIR += $(DEFAULT_DIR)); \
-                                      $(eval NOT_EXIST =),);
+                                      $(eval NOT_IN_WORKSPACE =),);
 
 $(eval DEFAULT_DIR := ../$(1)/$(INC_DIR_NAME));
 $(if $(wildcard $(DEFAULT_DIR)/*.h*), $(eval INCLUDE += -I$(DEFAULT_DIR)); \
                                       $(eval INCLUDE_DIR += $(DEFAULT_DIR)); \
-                                      $(eval NOT_EXIST =),);
+                                      $(eval NOT_IN_WORKSPACE =),);
 
 $(eval DEFAULT_DIR := ../$(1)/$(SRC_DIR_NAME));
 $(if $(or $(wildcard $(DEFAULT_DIR)/*.h*), \
           $(wildcard $(DEFAULT_DIR)/*/*.h*)), \
               $(eval INCLUDE += -I$(DEFAULT_DIR)); \
               $(eval INCLUDE_DIR += $(DEFAULT_DIR)); \
-              $(eval NOT_EXIST =),);
+              $(eval NOT_IN_WORKSPACE =),);
 
 $(eval CUR_LIB_PATH = $(WORKSPACE_DIR)/$(1)/$(BIN_DIR_NAME)/$(DEP_CONFIG)_$(TARGET_ARCH));
 # TODO : Gérer les librairies avec le préfixe déjà ajouté
-$(eval CUR_LIB = $(LIB_PREFIX)$(1)$(TYPE_SUFFIX));
-$(if $(or $(wildcard $(CUR_LIB_PATH)/$(CUR_LIB).$(LIB_EXT)*), \
-          $(wildcard $(CUR_LIB_PATH)/$(CUR_LIB).$(SHARED_EXT)*), \
-          $(NOT_EXIST)), \
-              $(eval LDFLAGS += -L$(CUR_LIB_PATH) -l$(1)); \
-              $(eval DEP_LIB_PATH:=$(DEP_LIB_PATH):$(CUR_LIB_PATH)),);           
+$(eval CUR_LIB = $(LIB_PREFIX)$(1));
+
+$(if $(wildcard $(CUR_LIB_PATH)/*), \
+                $(eval SUFFIX = $(TYPE_SUFFIX)),);
+$(if $(or $(wildcard $(CUR_LIB_PATH)/$(CUR_LIB)$(SUFFIX).$(LIB_EXT)*), \
+          $(wildcard $(CUR_LIB_PATH)/$(CUR_LIB)$(SUFFIX).$(SHARED_EXT)*)), \
+              $(eval LDFLAGS += -L$(CUR_LIB_PATH) -l$(1)$(SUFFIX)); \
+              $(eval DEP_LIB_PATH:=$(DEP_LIB_PATH):$(CUR_LIB_PATH)),);
+$(if $(NOT_IN_WORKSPACE), $(eval LDFLAGS += -l$(1)$(SUFFIX)));               
 endef
 
 $(foreach lib,$(DEPENDENCIES),$(call find_dependency,$(lib)))
