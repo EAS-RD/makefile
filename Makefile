@@ -1,6 +1,6 @@
 ## *****************************************************************************
 ## **                                                                         **
-## **                     Copyright (c) 2018 by Tuxin                            **
+## **                     Copyright 2018 (c) Tuxin                            **
 ## **   Licensed under the Apache License, Version 2.0 (the "License");       **
 ## **   you may not use this file except in compliance with the License.      **
 ## **   You may obtain a copy of the License at                               **                                                   
@@ -23,9 +23,16 @@
 ##              directory architecture.
 ##
 ## @author      Tuxin (JPB)
-## @version     1.0.0
+## @version     1.2.0
 ## @since       Created 04/25/2018 (JPB)
-## @date        April 25, 2018
+## @since       Modified 10/15/2018 (JPB) - Add 'dependencies' rule.
+## @since       Modified 10/19/2018 (JPB) - The version number and the type
+##                                          (shared or static) of the libraries
+##                                          can be specified in the dependency
+##                                          variables.
+## @since       Modified 10/26/2018 (JPB) - Correction des inclusions de lib.
+## 
+## @date        October 26, 2018
 ##
 ## *****************************************************************************
 .DEFAULT_GOAL = without_target
@@ -129,14 +136,19 @@ PROJECT_NAME := makefile
 ## \def DEPENDENCIES
 ## \brief Sets the name of libraries whose binary depends.
 ##  These libraries must be in a path of the LD_LIBRARY_PATH variable, in the
-##  system default directories, or in workspace.
+##  system default directories, or in workspace. Library names must be
+##  separated by at least one space. The version of the library can be
+##  specified by adding it after the name followed by ':'. If the link is
+##  static, the library name must be enclosed by '[..].
+##  Here are some examples allowed: mylib:1.2.0 thelib:1 [staticlib] [commonlib:2.1]
 ##
 DEPENDENCIES := common
 
 ## \def TEST_DEPENDENCIES
 ## \brief Sets the name of libraries whose unit testing depends.
 ##  These libraries must be in a path of the LD_LIBRARY_PATH variable, in the
-##  system default directories, or in workspace.
+##  system default directories, or in workspace. The same rules as the variable
+##  'DEPENDENCIES' apply for the name of the libraries indicated.
 ##
 TEST_DEPENDENCIES :=
 
@@ -604,36 +616,53 @@ endef
 
 # gcc flags generating for include files and libraries
 define find_dependency
-$(eval DEFAULT_DIR := ../$(1)/$(SRC_DIR_NAME)/$(INC_DIR_NAME));
+$(eval LIB_NAME := $(strip $(1)));
+$(eval LIB_VERSION :=);
+$(eval CUR_LIB_EXT := $(SHARED_EXT));
+
+$(if $(findstring [,$(LIB_NAME)),
+    $(eval CUR_LIB_EXT := $(LIB_EXT)); \
+    $(eval LIB_NAME := $(subst [,,$(LIB_NAME))); \
+    $(eval LIB_NAME := $(subst ],,$(LIB_NAME))),
+); 
+    
+$(if $(findstring :,$(LIB_NAME)),
+    $(eval LIB_NAME := $(subst :, ,$(LIB_NAME))); \
+    $(eval LIB_VERSION := $(lastword $(LIB_NAME))); \
+    $(eval LIB_NAME := $(firstword $(LIB_NAME))),
+);
+
+$(eval DEFAULT_DIR := $(WORKSPACE_DIR)/$(LIB_NAME)/$(SRC_DIR_NAME)/$(INC_DIR_NAME));
 $(eval SUFFIX :=);
 $(eval NOT_IN_WORKSPACE = 1);
 $(if $(wildcard $(DEFAULT_DIR)/*.h*), $(eval INCLUDE += -I$(DEFAULT_DIR)); \
                                       $(eval INCLUDE_DIR += $(DEFAULT_DIR)); \
                                       $(eval NOT_IN_WORKSPACE =),);
 
-$(eval DEFAULT_DIR := ../$(1)/$(INC_DIR_NAME));
-$(if $(wildcard $(DEFAULT_DIR)/*.h*), $(eval INCLUDE += -I$(DEFAULT_DIR)); \
-                                      $(eval INCLUDE_DIR += $(DEFAULT_DIR)); \
-                                      $(eval NOT_IN_WORKSPACE =),);
-
-$(eval DEFAULT_DIR := ../$(1)/$(SRC_DIR_NAME));
+$(eval DEFAULT_DIR := $(WORKSPACE_DIR)/$(LIB_NAME)/$(INC_DIR_NAME));
 $(if $(or $(wildcard $(DEFAULT_DIR)/*.h*), \
           $(wildcard $(DEFAULT_DIR)/*/*.h*)), \
               $(eval INCLUDE += -I$(DEFAULT_DIR)); \
               $(eval INCLUDE_DIR += $(DEFAULT_DIR)); \
               $(eval NOT_IN_WORKSPACE =),);
 
-$(eval CUR_LIB_PATH = $(WORKSPACE_DIR)/$(1)/$(BIN_DIR_NAME)/$(DEP_CONFIG)_$(TARGET_ARCH));
-# TODO : Gérer les librairies avec le préfixe déjà ajouté
-$(eval CUR_LIB = $(LIB_PREFIX)$(1));
+$(eval DEFAULT_DIR := $(WORKSPACE_DIR)/$(LIB_NAME)/$(SRC_DIR_NAME));
+$(if $(or $(wildcard $(DEFAULT_DIR)/*.h*), \
+          $(wildcard $(DEFAULT_DIR)/*/*.h*)), \
+              $(eval INCLUDE += -I$(DEFAULT_DIR)); \
+              $(eval INCLUDE_DIR += $(DEFAULT_DIR)); \
+              $(eval NOT_IN_WORKSPACE =),);
+
+$(eval CUR_LIB_PATH = $(WORKSPACE_DIR)/$(LIB_NAME)/$(BIN_DIR_NAME)/$(DEP_CONFIG)_$(TARGET_ARCH));
+$(eval CUR_LIB = $(LIB_PREFIX)$(LIB_NAME));
 
 $(if $(wildcard $(CUR_LIB_PATH)/*), \
                 $(eval SUFFIX = $(TYPE_SUFFIX)),);
 $(if $(or $(wildcard $(CUR_LIB_PATH)/$(CUR_LIB)$(SUFFIX).$(LIB_EXT)*), \
           $(wildcard $(CUR_LIB_PATH)/$(CUR_LIB)$(SUFFIX).$(SHARED_EXT)*)), \
-              $(eval LDFLAGS += -L$(CUR_LIB_PATH) -l$(1)$(SUFFIX)); \
+              $(eval LDFLAGS += -L$(CUR_LIB_PATH) -l$(LIB_NAME)$(SUFFIX)); \
               $(eval DEP_LIB_PATH:=$(DEP_LIB_PATH):$(CUR_LIB_PATH)),);
-$(if $(NOT_IN_WORKSPACE), $(eval LDFLAGS += -l$(1)$(SUFFIX)));               
+$(if $(NOT_IN_WORKSPACE), $(eval LDFLAGS += -l$(LIB_NAME)$(SUFFIX)));               
 endef
 
 $(foreach lib,$(DEPENDENCIES),$(call find_dependency,$(lib)))
@@ -761,6 +790,7 @@ display_config: #= Display configuration variables
 	@echo "* DEFAULT_LIB_DIR=$(DEFAULT_LIB_DIR)"
 	@echo "* PROJECT_DIR=$(PROJECT_DIR)"
 	@echo "* WORKSPACE_DIR=$(WORKSPACE_DIR)"
+	@echo "* DEP_LIB_PATH=$(DEP_LIB_PATH)"
 	@echo
 	@echo $(COLOR)Build informations$(END_COLOR)
 	@echo ------------------
