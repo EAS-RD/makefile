@@ -30,7 +30,9 @@
 ##                                          (shared or static) of the libraries
 ##                                          can be specified in the dependency
 ##                                          variables.
-## @date        October 19, 2018
+## @since       Modified 10/26/2018 (JPB) - Correction des inclusions de lib.
+## 
+## @date        October 26, 2018
 ##
 ## *****************************************************************************
 .DEFAULT_GOAL = without_target
@@ -630,47 +632,37 @@ $(if $(findstring :,$(LIB_NAME)),
     $(eval LIB_NAME := $(firstword $(LIB_NAME))),
 );
 
-$(eval DEFAULT_DIR := ../$(LIB_NAME)/$(SRC_DIR_NAME)/$(INC_DIR_NAME));
-$(eval NOT_EXIST = 1);
-$(if $(wildcard $(DEFAULT_DIR)/*.h*),
-    $(eval INCLUDE += -I$(DEFAULT_DIR)); \
-    $(eval INCLUDE_DIR += $(DEFAULT_DIR)); \
-    $(eval NOT_EXIST =),
-);
+$(eval DEFAULT_DIR := $(WORKSPACE_DIR)/$(LIB_NAME)/$(SRC_DIR_NAME)/$(INC_DIR_NAME));
+$(eval SUFFIX :=);
+$(eval NOT_IN_WORKSPACE = 1);
+$(if $(wildcard $(DEFAULT_DIR)/*.h*), $(eval INCLUDE += -I$(DEFAULT_DIR)); \
+                                      $(eval INCLUDE_DIR += $(DEFAULT_DIR)); \
+                                      $(eval NOT_IN_WORKSPACE =),);
 
-$(eval DEFAULT_DIR := ../$(LIB_NAME)/$(INC_DIR_NAME));
-$(if $(wildcard $(DEFAULT_DIR)/*.h*),
-    $(eval INCLUDE += -I$(DEFAULT_DIR)); \
-    $(eval INCLUDE_DIR += $(DEFAULT_DIR)); \
-    $(eval NOT_EXIST =),
-);
+$(eval DEFAULT_DIR := $(WORKSPACE_DIR)/$(LIB_NAME)/$(INC_DIR_NAME));
+$(if $(or $(wildcard $(DEFAULT_DIR)/*.h*), \
+          $(wildcard $(DEFAULT_DIR)/*/*.h*)), \
+              $(eval INCLUDE += -I$(DEFAULT_DIR)); \
+              $(eval INCLUDE_DIR += $(DEFAULT_DIR)); \
+              $(eval NOT_IN_WORKSPACE =),);
 
-$(eval DEFAULT_DIR := ../$(LIB_NAME)/$(SRC_DIR_NAME));
-$(if $(or $(wildcard $(DEFAULT_DIR)/*.h*),
-          $(wildcard $(DEFAULT_DIR)/*/*.h*) \
-      ),
-     $(eval INCLUDE += -I$(DEFAULT_DIR)); \
-     $(eval INCLUDE_DIR += $(DEFAULT_DIR)); \
-     $(eval NOT_EXIST =),
-);
+$(eval DEFAULT_DIR := $(WORKSPACE_DIR)/$(LIB_NAME)/$(SRC_DIR_NAME));
+$(if $(or $(wildcard $(DEFAULT_DIR)/*.h*), \
+          $(wildcard $(DEFAULT_DIR)/*/*.h*)), \
+              $(eval INCLUDE += -I$(DEFAULT_DIR)); \
+              $(eval INCLUDE_DIR += $(DEFAULT_DIR)); \
+              $(eval NOT_IN_WORKSPACE =),);
 
 $(eval CUR_LIB_PATH = $(WORKSPACE_DIR)/$(LIB_NAME)/$(BIN_DIR_NAME)/$(DEP_CONFIG)_$(TARGET_ARCH));
-$(eval CUR_LIB = $(LIB_PREFIX)$(LIB_NAME)$(TYPE_SUFFIX));
-$(if $(or $(wildcard $(CUR_LIB_PATH)/$(CUR_LIB).$(LIB_EXT)*),
-          $(wildcard $(CUR_LIB_PATH)/$(CUR_LIB).$(SHARED_EXT)*),
-          $(NOT_EXIST) \
-      ),
-      $(eval LDFLAGS += -L$(CUR_LIB_PATH)); \
-      $(if $(LIB_VERSION),
-          $(eval LDFLAGS += -l:$(LIB_PREFIX)$(LIB_NAME)$(TYPE_SUFFIX).$(CUR_LIB_EXT).$(LIB_VERSION)),
-          $(eval LDFLAGS += -l$(LIB_NAME)$(TYPE_SUFFIX))
-      ); \
-      $(if $(filter $(CUR_LIB_EXT),$(SHARED_EXT)),
-          $(eval DEP_LIB_PATH:=$(DEP_LIB_PATH):$(CUR_LIB_PATH)),
-      ),
-);
+$(eval CUR_LIB = $(LIB_PREFIX)$(LIB_NAME));
 
-$(info DEP_LIB_PATH=$(DEP_LIB_PATH));         
+$(if $(wildcard $(CUR_LIB_PATH)/*), \
+                $(eval SUFFIX = $(TYPE_SUFFIX)),);
+$(if $(or $(wildcard $(CUR_LIB_PATH)/$(CUR_LIB)$(SUFFIX).$(LIB_EXT)*), \
+          $(wildcard $(CUR_LIB_PATH)/$(CUR_LIB)$(SUFFIX).$(SHARED_EXT)*)), \
+              $(eval LDFLAGS += -L$(CUR_LIB_PATH) -l$(LIB_NAME)$(SUFFIX)); \
+              $(eval DEP_LIB_PATH:=$(DEP_LIB_PATH):$(CUR_LIB_PATH)),);
+$(if $(NOT_IN_WORKSPACE), $(eval LDFLAGS += -l$(LIB_NAME)$(SUFFIX)));               
 endef
 
 $(foreach lib,$(DEPENDENCIES),$(call find_dependency,$(lib)))

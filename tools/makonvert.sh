@@ -27,9 +27,15 @@ cmdControl () {
         fi
     fi
 }
+
+if [ ! -d ".settings" ]; then
+    mkdir .settings
+fi
+
 # Decompress files
 cmdControl "D" "tar -xzf makonvert.tar.gz"
-rm makonvert.tar.gz
+#rm makonvert.tar.gz
+#rm makonvert.sh
 
 # Creates the necessary files
 cmdControl "R" "mv org.eclipse.cdt.core.prefs .settings/org.eclipse.cdt.core.prefs"
@@ -41,4 +47,9 @@ cmdControl "R" "mv template.doxyfile ${1}.doxyfile"
 find . -type f -exec sed -i "s/xTemplatex/${1}/g" '{}' +
 
 rm makonvert.sh
+mkdir log
+mkdir test
+mkdir src
+mkdir include
+
 
