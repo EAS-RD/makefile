@@ -23,16 +23,17 @@
 ##              directory architecture.
 ##
 ## @author      Tuxin (JPB)
-## @version     1.2.0
+## @version     1.3.0
 ## @since       Created 04/25/2018 (JPB)
 ## @since       Modified 10/15/2018 (JPB) - Add 'dependencies' rule.
 ## @since       Modified 10/19/2018 (JPB) - The version number and the type
 ##                                          (shared or static) of the libraries
 ##                                          can be specified in the dependency
 ##                                          variables.
-## @since       Modified 10/26/2018 (JPB) - Correction des inclusions de lib.
+## @since       Modified 10/26/2018 (JPB) - Fixed libraries inclusions.
+## @since       Modified 11/02/2018 (JPB) - Fixed include directory management
 ## 
-## @date        October 26, 2018
+## @date        November 2, 2018
 ##
 ## *****************************************************************************
 .DEFAULT_GOAL = without_target
@@ -118,6 +119,34 @@ END_COLOR ?= "\\033[0m"
 ## contain sub-directories.
 ## * test ($TEST_DIR) : Root directory of the unit testing source files.
 ##
+## \subsection use Use Makefile
+## In principle, the only variables to modify to adapt this Makefile to your
+## project are those of the 'Project Variables' section. This section includes
+## PROJECT_NAME, DEPENDENCIES, TEST_DEPENDENCIES, LIB_DIR, TEST_LIB_DIR, and
+## BINARY_TYPE.
+## Then some variables in the 'Build variables' section can be defined by your
+## development environment. These are CONFIG, TARGET_ARCH, OS_TYPE, MAJ_VERSION,
+## MIN_VERSION, BUILD_VERSION, and PRE_DEFINED. It is best to use a file
+## containing the version number (vers-number.txt). In this case, the version
+## variables are automatically updated with this file.
+## For example, using Eclipse CDT as IDE, we can, for a configuration intended
+## for a Linux PC environment, define the following variables:
+## * CONFIG = Debug
+## * TARGET_ARCH = x86_64
+## * OS_TYPE = Linux64
+## The simple modification of these variables will allow you to change the build
+## configuration.
+##
+## \subsection rules Makefile rules
+## Existing rules can be listed by typing 'make help' or simply 'make'.
+## * all             Builds project
+## * dependencies    Creates a file to configure the LD_LIBRARY_PATH variable.
+## * display_config  Display current configuration variables
+## * clear_tarball   Clear all packages
+## * clean           Delete object files
+## * mrproper        Clear all generated files
+## * help            This help message
+
 #-------------------------------------------------------------------------------
 ## \addtogroup Makefile
 ## \{
@@ -350,18 +379,7 @@ SRC_DIR := ${SRC_DIR_NAME}
 ## \def SRC_SUBDIR
 ## \brief Defines the sub-directories of sources
 ##
-SRC_SUBDIR := $(shell cd $(SRC_DIR) && ls -d */ 2>/dev/null)
-DUMMY_VAR := $(info $(SRC_SUBDIR))
-
-## \def TEST_DIR
-## \brief Defines the parent directory of unit testing sources
-##
-TEST_DIR:= $(TEST_DIR_NAME)
-
-## \def BIN_DIR
-## \brief Defines the parent directory of binaries
-##
-BIN_DIR := ${BIN_DIR_NAME}
+SRC_SUBDIR := $(shell cd $(PROJECT_DIR)/$(SRC_DIR) && ls -d */ 2>/dev/null)
 
 ## \def INC_DIR
 ## \brief Defines directory for header files to be deployed with
@@ -373,6 +391,16 @@ INC_DIR := ${INC_DIR_NAME}
 ## \brief Defines directory for header files required for unit testing
 ##
 TEST_INC_DIR := ${INC_DIR_NAME}
+
+## \def TEST_DIR
+## \brief Defines the parent directory of unit testing sources
+##
+TEST_DIR:= $(TEST_DIR_NAME)
+
+## \def BIN_DIR
+## \brief Defines the parent directory of binaries
+##
+BIN_DIR := ${BIN_DIR_NAME}
 
 ## \def OBJ_DIR
 ## \brief Defines directory where the object files will be stored during compilation.
@@ -403,23 +431,6 @@ ifneq ("$(wildcard $(VERS_NUMBER_FILE))","")
   MIN_VERSION := $(word 2, $(DUMMY_VAR))
   BUILD_VERSION := $(word 3, $(DUMMY_VAR))
 endif
-
-
-# -----------------
-# FIND SOURCE FILES
-# -----------------
-# Not Used function
-define find_source
-$(eval FOUND_SRC = "") ;
-$(eval SEARCH_DIR = ${SRC_DIR}) ;
-for deapth in 1 2 3 4 ; do \
-  FOUND_SRC += $(wildcard $(SEARCH_DIR)/*.$(1)) ; \
-  SEARCH_DIR := $(SEARCH_DIR)/* ; \
-done;
-ifeq ($(1),c)
-  $(eval C_SOURCES = $(FOUND_SRC)) ;
-endif
-endef
 
 ## \def C_SOURCES
 ## \brief Defines the list of c source files.
@@ -583,8 +594,8 @@ ifeq (${CONFIG}, Release)
   CXXFLAGS +=
   TYPE_SUFFIX := 
 else
-  CFLAGS += -g3 -Og
-  CXXFLAGS += -g3 -Og
+  CFLAGS += -ggdb -Og
+  CXXFLAGS += -ggdb -Og
   TYPE_SUFFIX := _d
 endif
 
@@ -632,12 +643,8 @@ $(if $(findstring :,$(LIB_NAME)),
     $(eval LIB_NAME := $(firstword $(LIB_NAME))),
 );
 
-$(eval DEFAULT_DIR := $(WORKSPACE_DIR)/$(LIB_NAME)/$(SRC_DIR_NAME)/$(INC_DIR_NAME));
 $(eval SUFFIX :=);
 $(eval NOT_IN_WORKSPACE = 1);
-$(if $(wildcard $(DEFAULT_DIR)/*.h*), $(eval INCLUDE += -I$(DEFAULT_DIR)); \
-                                      $(eval INCLUDE_DIR += $(DEFAULT_DIR)); \
-                                      $(eval NOT_IN_WORKSPACE =),);
 
 $(eval DEFAULT_DIR := $(WORKSPACE_DIR)/$(LIB_NAME)/$(INC_DIR_NAME));
 $(if $(or $(wildcard $(DEFAULT_DIR)/*.h*), \
@@ -645,6 +652,12 @@ $(if $(or $(wildcard $(DEFAULT_DIR)/*.h*), \
               $(eval INCLUDE += -I$(DEFAULT_DIR)); \
               $(eval INCLUDE_DIR += $(DEFAULT_DIR)); \
               $(eval NOT_IN_WORKSPACE =),);
+
+$(eval DEFAULT_DIR := $(WORKSPACE_DIR)/$(LIB_NAME)/$(SRC_DIR_NAME)/$(INC_DIR_NAME));
+$(if $(wildcard $(DEFAULT_DIR)/*.h*),
+         $(eval INCLUDE += -I$(DEFAULT_DIR)); \
+         $(eval INCLUDE_DIR += $(DEFAULT_DIR)); \
+         $(eval NOT_IN_WORKSPACE =),);
 
 $(eval DEFAULT_DIR := $(WORKSPACE_DIR)/$(LIB_NAME)/$(SRC_DIR_NAME));
 $(if $(or $(wildcard $(DEFAULT_DIR)/*.h*), \
@@ -662,10 +675,11 @@ $(if $(or $(wildcard $(CUR_LIB_PATH)/$(CUR_LIB)$(SUFFIX).$(LIB_EXT)*), \
           $(wildcard $(CUR_LIB_PATH)/$(CUR_LIB)$(SUFFIX).$(SHARED_EXT)*)), \
               $(eval LDFLAGS += -L$(CUR_LIB_PATH) -l$(LIB_NAME)$(SUFFIX)); \
               $(eval DEP_LIB_PATH:=$(DEP_LIB_PATH):$(CUR_LIB_PATH)),);
-$(if $(NOT_IN_WORKSPACE), $(eval LDFLAGS += -l$(LIB_NAME)$(SUFFIX)));               
+$(if $(NOT_IN_WORKSPACE), $(eval LDFLAGS += -l$(LIB_NAME)$(SUFFIX)));
 endef
 
 $(foreach lib,$(DEPENDENCIES),$(call find_dependency,$(lib)))
+$(eval INCLUDE += -I$(SRC_DIR) -I$(INC_DIR));
 
 ifeq (${CONFIG}, Test)
   $(foreach lib,$(TEST_LIB),$(call find_dependency,$(lib)))
@@ -745,11 +759,11 @@ $(OBJ_DIR)/$(SRC_DIR_NAME)/%.o: $(SRC_DIR)/%.cpp $(OBJ_DIR)/$(SRC_DIR_NAME)/%.d
 
 $(OBJ_DIR)/$(TEST_DIR_NAME)/%.o: $(TEST_DIR_NAME)/%.c $(OBJ_DIR)/$(TEST_DIR_NAME)/%.d
 	@echo "$(COLOR)--> Compiling C source file $<$(END_COLOR)"
-	$(CC) $(CFLAGS) $(INCLUDE) -I./src -I./$(INC_DIR) -o $@ -c $<;
+	$(CC) $(CFLAGS) $(INCLUDE) -o $@ -c $<;
 
 $(OBJ_DIR)/$(TEST_DIR_NAME)/%.o: $(TEST_DIR_NAME)/%.cpp $(OBJ_DIR)/$(TEST_DIR_NAME)/%.d
 	@echo "$(COLOR)--> Compiling C++ source file $<$(END_COLOR)";
-	$(CXX) $(CXXFLAGS) $(INCLUDE) -I./src -I./$(INC_DIR)  -o $@ -c $<;
+	$(CXX) $(CXXFLAGS) $(INCLUDE) -o $@ -c $<;
 			
 finalize: clear_tarball 
 ifeq (${CONFIG}, Test)
@@ -771,7 +785,7 @@ else
 	@cd $(PROJECT_DIR)
 endif
 
-dependencies:
+dependencies: #= Creates a file to configure the LD_LIBRARY_PATH variable.
 	@echo "$(COLOR)--> Génération du fichier $(PROJECT_NAME).dep$(END_COLOR)"
 	@echo "export LD_LIBRARY_PATH=$$\c" > $(PROJECT_DIR)/$(PROJECT_NAME).dep
 	@echo "{LD_LIBRARY_PATH}$(DEP_LIB_PATH)" >> $(PROJECT_DIR)/$(PROJECT_NAME).dep
@@ -780,6 +794,7 @@ display_config: #= Display configuration variables
 	@echo $(COLOR)Directories list$(END_COLOR)
 	@echo ----------------
 	@echo "* SRC_DIR=$(SRC_DIR)"
+	@echo "* SRC_SUBDIR=$(SRC_SUBDIR)"
 	@echo "* TEST_DIR=$(TEST_DIR)"
 	@echo "* BIN_DIR=$(BIN_DIR)"
 	@echo "* LIB_DIR=$(LIB_DIR)"
@@ -844,14 +859,12 @@ help: $(MAKEFILE_LIST) #= This help message
 	@echo 
 
 ifeq ($(MAKECMDGOALS),all)
-  $(info --> Creates missing directories)
-#  $(shell echo $(COLOR)--> Creates missing directories$(END_COLOR))
-  $(shell mkdir -p $(OBJ_DIR))
-  $(shell mkdir -p $(LOG_DIR))
+  $(info $(COLOR)--> Creates missing directories$(END_COLOR))
   $(shell mkdir -p $(OBJ_DIR)/$(SRC_DIR_NAME))
   $(shell for i in ${SRC_SUBDIR} ; do mkdir -p $(OBJ_DIR)/$(SRC_DIR_NAME)/$$i ; done)
   $(shell mkdir -p $(OBJ_DIR)/$(TEST_DIR_NAME))
-#  DUMMY_VAR := $(error erreur)
+  $(shell mkdir -p $(LOG_DIR))
+  #  DUMMY_VAR := $(error erreur)
   # Includes dependencies
   -include $(DEP_FILES)
   # Includes revision number rules.
