@@ -23,7 +23,7 @@
 ##              directory architecture.
 ##
 ## @author      Tuxin (JPB)
-## @version     1.3.0
+## @version     1.4.0
 ## @since       Created 04/25/2018 (JPB)
 ## @since       Modified 10/15/2018 (JPB) - Add 'dependencies' rule.
 ## @since       Modified 10/19/2018 (JPB) - The version number and the type
@@ -32,8 +32,10 @@
 ##                                          variables.
 ## @since       Modified 10/26/2018 (JPB) - Fixed libraries inclusions.
 ## @since       Modified 11/02/2018 (JPB) - Fixed include directory management
+## @since       Modified 12/14/2018 (JPB) - Generate symbolic link for test bin.
+## @since       Modified 02/04/2019 (JPB) - Use externally defined compiler var.
 ## 
-## @date        November 2, 2018
+## @date        February 4, 2019
 ##
 ## *****************************************************************************
 .DEFAULT_GOAL = without_target
@@ -507,20 +509,84 @@ LOCAL_ARCH := $(shell arch)
 ##
 ARM_FAMILY := cortex-a8
 
+# Sets prefix for specific compilator
+ifneq (${TARGET_ARCH}, ${LOCAL_ARCH})
+  ifeq (${TARGET_ARCH}, arm)
+    CROSS_COMPILE ?= arm-linux-gnueabi-
+  endif
+  ifeq (${TARGET_ARCH}, armhf)
+    CROSS_COMPILE ?= arm-linux-gnueabihf-
+  endif
+  ifeq (${TARGET_ARCH}, win32)
+    CROSS_COMPILE ?= i686-w64-mingw32-
+  endif
+  ifeq (${TARGET_ARCH}, win64)
+    CROSS_COMPILE ?= x86_64-w64-mingw32-
+  endif
+endif
+
+# If it's default variables, we redefine them
+ifeq ($(origin CC),default)
+## \def AR
+## \brief Stores archiver command
+##
+AR = "$(CROSS_COMPILE)ar -q"
+
+## \def AS
+## \brief Stores assembler command
+##
+AS = "$(CROSS_COMPILE)as "
+
 ## \def CC
 ## \brief Stores C compilator executable
 ##
-CC = $(CROSS_COMPILE)gcc
+CC = "$(CROSS_COMPILE)gcc"
+
+## \def CPP
+## \brief Stores C compilator executable for preprocess only
+##
+CPP = "$(CROSS_COMPILE)gcc -E"
 
 ## \def CXX
 ## \brief Stores C++ compilator executable
 ##
-CXX = $(CROSS_COMPILE)g++
+CXX = "$(CROSS_COMPILE)g++"
 
-## \def AR
+## \def GDB
 ## \brief Stores archiver command
 ##
-AR = ar -q
+GDB = "$(CROSS_COMPILE)gdb"
+
+## \def LD
+## \brief Stores linker command
+##
+LD = "$(CROSS_COMPILE)ld "
+
+## \def NM
+## \brief Stores xxx command
+##
+NM = "$(CROSS_COMPILE)nm"
+
+## \def STRIP
+## \brief Stores xxx command
+##
+STRIP = "$(CROSS_COMPILE)strip"
+
+## \def OBJCOPY
+## \brief Stores xxx command
+##
+OBJCOPY = "$(CROSS_COMPILE)objcopy"
+
+## \def OBJDUMP
+## \brief Stores xxx command
+##
+OBJDUMP = "$(CROSS_COMPILE)objdump"
+
+## \def RANLIB
+## \brief Stores xxx command
+##
+RANLIB = "$(CROSS_COMPILE)ranlib"
+endif
 
 ## \def RM
 ## \brief Stores remove command
@@ -541,21 +607,29 @@ COMMON_FLAGS = -fmessage-length=0 -fsigned-char -ffunction-sections -fdata-secti
 ## \brief Defines the C and C++ common compilation flags
 ##
 COMPIL_FLAGS = $(COMMON_FLAGS) $(PRE_DEFINED) -ansi -pedantic
+ifeq (${CONFIG}, Test)
+  COMPIL_FLAGS += -fprofile-arcs -ftest-coverage
+endif
 
 ## \def CFLAGS
 ## \brief Defines the C compilation flags
 ##
-CFLAGS = $(COMPIL_FLAGS) -std=gnu11
+CFLAGS ?= $(COMPIL_FLAGS)
+ CFLAGS += -std=gnu11
 
 ## \def CXXFLAGS
 ## \brief Defines the C++ compilation flags
 ##
-CXXFLAGS = $(COMPIL_FLAGS) -std=gnu++11
+CXXFLAGS ?= $(COMPIL_FLAGS)
+ CXXFLAGS += -std=gnu++11
 
 ## \def LDFLAGS
 ## \brief Defines the linker flags
 ##
-LDFLAGS = $(COMMON_FLAGS) -Xlinker --gc-sections -Wl,-Map,"$(LOG_DIR)/$(PROJECT_NAME)$(TYPE_SUFFIX)-$(VERSION).map"
+LDFLAGS ?= $(COMMON_FLAGS) -Xlinker --gc-sections -Wl,-Map,"$(LOG_DIR)/$(PROJECT_NAME)$(TYPE_SUFFIX)-$(VERSION).map"
+ifeq (${CONFIG}, Test)
+  LDFLAGS += -fprofile-arcs
+endif
 
 ## \def DEP_LIB_PATH
 ## \brief Variable used to define the contents of LD_LIBRARY_PATH ('dependencies' rule)
@@ -686,23 +760,6 @@ ifeq (${CONFIG}, Test)
   $(foreach lib,$(TEST_DEPENDENCIES),$(call find_dependency,$(lib)))
 endif
 # ------------------------------------------------------------------------------
-
-# Sets prefix for specific compilator
-ifneq (${TARGET_ARCH}, ${LOCAL_ARCH})
-  ifeq (${TARGET_ARCH}, arm)
-    CROSS_COMPILE ?= arm-linux-gnueabi-
-  endif
-  ifeq (${TARGET_ARCH}, armhf)
-    CROSS_COMPILE ?= arm-linux-gnueabihf-
-  endif
-  ifeq (${TARGET_ARCH}, win32)
-    CROSS_COMPILE ?= i686-w64-mingw32-
-  endif
-  ifeq (${TARGET_ARCH}, win64)
-    CROSS_COMPILE ?= x86_64-w64-mingw32-
-  endif
-endif
-
 ifeq (${BINARY_TYPE},exe)
   BINARY_NAME = $(BINARY_PREFIX)$(PROJECT_NAME)$(TYPE_SUFFIX)-$(VERSION)
   BINARY_FILE = $(BINARY_NAME)$(BINARY_EXT)
@@ -765,21 +822,21 @@ $(OBJ_DIR)/$(TEST_DIR_NAME)/%.o: $(TEST_DIR_NAME)/%.cpp $(OBJ_DIR)/$(TEST_DIR_NA
 	@echo "$(COLOR)--> Compiling C++ source file $<$(END_COLOR)";
 	$(CXX) $(CXXFLAGS) $(INCLUDE) -o $@ -c $<;
 			
-finalize: clear_tarball 
+finalize: clear_tarball
+	@echo "$(COLOR)--> Symbolic links creation$(END_COLOR)"
+	@ln -s -f -r $(OBJ_DIR)/$(BINARY_FILE) \
+		$(OBJ_DIR)/$(BINARY_PREFIX)$(PROJECT_NAME)$(TYPE_SUFFIX)$(BINARY_EXT)
 ifeq (${CONFIG}, Test)
 	@echo "$(COLOR)--> Cppcheck report creation$(END_COLOR)"
 	@mkdir -p $(PROJECT_DIR)/${LOG_DIR_NAME}
 	@/usr/bin/cppcheck --xml-version=2 --enable=all ./${SRC_DIR_NAME}/ 2> ./${LOG_DIR_NAME}/${PROJECT_NAME}.xml
-else  
-	@echo "$(COLOR)--> Symbolic links creation$(END_COLOR)"
-	@ln -s -f -r $(OBJ_DIR)/$(BINARY_FILE) \
-		$(OBJ_DIR)/$(BINARY_PREFIX)$(PROJECT_NAME)$(TYPE_SUFFIX)$(BINARY_EXT)
-    ifeq (${BINARY_TYPE}, shared)
-	    @ln -s -f -r $(OBJ_DIR)/$(BINARY_FILE) \
+else
+  ifeq (${BINARY_TYPE}, shared)
+		@ln -s -f -r $(OBJ_DIR)/$(BINARY_FILE) \
 		      $(OBJ_DIR)/$(BINARY_PREFIX)$(PROJECT_NAME)$(TYPE_SUFFIX)$(BINARY_EXT).${MAJ_VERSION}.${MIN_VERSION}
-	    @ln -s -f -r $(OBJ_DIR)/$(BINARY_FILE) \
+		@ln -s -f -r $(OBJ_DIR)/$(BINARY_FILE) \
 		      $(OBJ_DIR)/$(BINARY_PREFIX)$(PROJECT_NAME)$(TYPE_SUFFIX)$(BINARY_EXT).${MAJ_VERSION}
-    endif
+  endif
 	@echo "$(COLOR)--> Tarball creation$(END_COLOR)"
 	@cd $(OBJ_DIR) && tar --exclude=*.o -zcf ../${TARBALL_NAME} $(BINARY_PREFIX)$(PROJECT_NAME)$(TYPE_SUFFIX)*
 	@cd $(PROJECT_DIR)
@@ -791,6 +848,17 @@ dependencies: #= Creates a file to configure the LD_LIBRARY_PATH variable.
 	@echo "{LD_LIBRARY_PATH}$(DEP_LIB_PATH)" >> $(PROJECT_DIR)/$(PROJECT_NAME).dep
 
 display_config: #= Display configuration variables
+	@echo $(COLOR)Build Variables$(END_COLOR)
+	@echo ---------------
+	@echo "AR=$(AR)"
+	@echo "AS=$(AS)"
+	@echo "CC=$(CC)"
+	@echo "CPP=$(CPP)"
+	@echo "CXX=$(CXX)"
+	@echo "LD=$(LD)"
+	@echo "GDB=$(GDB)"
+	@echo "STRIP=$(STRIP)"
+	@echo
 	@echo $(COLOR)Directories list$(END_COLOR)
 	@echo ----------------
 	@echo "* SRC_DIR=$(SRC_DIR)"
@@ -843,7 +911,7 @@ display_config: #= Display configuration variables
 	@echo "* REV_NUMBER=$(REV_NUMBER)"
 
 clear_tarball: #= Clear all packages
-	@rm -f $(TARBALL_NAME)
+	@$(RM) -f $(TARBALL_NAME)
 	
 clean: #= Delete object files
 	@$(RM) $(OBJECTS)
