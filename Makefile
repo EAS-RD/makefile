@@ -23,7 +23,7 @@
 ##              directory architecture.
 ##
 ## @author      Tuxin (JPB)
-## @version     1.4.1
+## @version     1.4.2
 ## @since       Created 04/25/2018 (JPB)
 ## @since       Modified 10/15/2018 (JPB) - Add 'dependencies' rule.
 ## @since       Modified 10/19/2018 (JPB) - The version number and the type
@@ -36,8 +36,9 @@
 ## @since       Modified 02/04/2019 (JPB) - Use externally defined compiler var.
 ## @since       Modified 05/09/2019 (JPB) - We can specify that a dependency
 ##                                          can only have header files.
-## 
-## @date        May 9, 2019
+## @since       Modified 07/26/2019 (JPB) - Fixed text search in variables.
+##
+## @date        July 26, 2019
 ##
 ## *****************************************************************************
 .DEFAULT_GOAL = without_target
@@ -178,7 +179,7 @@ PROJECT_NAME := makefile
 ##  Here are some examples allowed: mylib:1.2.0 thelib:1 [staticlib]
 ##  [commonlib:2.1] @header_only
 ##
-DEPENDENCIES := common
+DEPENDENCIES := @common
 
 ## \def TEST_DEPENDENCIES
 ## \brief Sets the name of libraries whose unit testing depends.
@@ -229,7 +230,7 @@ endif
 ##
 PRE_DEFINED = -DVERSION=$(VERSION) -DREVISION=$(REV_NUMBER)
 ifeq ($(CONFIG),Debug)
-  PRE_DEFINED += -D_DEBUG 
+  PRE_DEFINED += -D_DEBUG
 endif
 
 ifeq ($(CONFIG),Release)
@@ -320,7 +321,7 @@ BINARY_PREFIX =
 BINARY_EXT =
 
 # Definitions of specific prefix and extensions for each OS type.
-ifeq (${OS_TYPE::3}, Win)
+ifeq ($(findstring Win,${OS_TYPE}), Win)
   LIB_PREFIX = 
   LIB_EXT = lib
   SHARED_EXT = dll
@@ -659,7 +660,7 @@ ifeq (${BINARY_TYPE},shared)
   CFLAGS += -fPIC
   CXXFLAGS += -fPIC
   LDFLAGS += -fPIC -shared
-  ifeq (${OS_TYPE::5}, Linux)
+  ifeq ($(findstring Linux,${OS_TYPE}), Linux)
     LDFLAGS += -Wl,-soname,$(BINARY_NAME).$(SHARED_EXT).$(MAJ_VERSION)
   endif
 endif
