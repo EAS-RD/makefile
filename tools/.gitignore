@@ -1,11 +1,10 @@
 # Répertoires du projet
+/dox/
 /build/
 /log/
-/dox/
 
 # Prerequisites
 *.d
-*.dep
 
 # Object files
 *.o

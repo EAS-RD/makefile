@@ -23,7 +23,7 @@
 ##              directory architecture.
 ##
 ## @author      Tuxin (JPB)
-## @version     1.4.0
+## @version     1.4.1
 ## @since       Created 04/25/2018 (JPB)
 ## @since       Modified 10/15/2018 (JPB) - Add 'dependencies' rule.
 ## @since       Modified 10/19/2018 (JPB) - The version number and the type
@@ -34,8 +34,10 @@
 ## @since       Modified 11/02/2018 (JPB) - Fixed include directory management
 ## @since       Modified 12/14/2018 (JPB) - Generate symbolic link for test bin.
 ## @since       Modified 02/04/2019 (JPB) - Use externally defined compiler var.
+## @since       Modified 05/09/2019 (JPB) - We can specify that a dependency
+##                                          can only have header files.
 ## 
-## @date        February 4, 2019
+## @date        May 9, 2019
 ##
 ## *****************************************************************************
 .DEFAULT_GOAL = without_target
@@ -171,7 +173,10 @@ PROJECT_NAME := makefile
 ##  separated by at least one space. The version of the library can be
 ##  specified by adding it after the name followed by ':'. If the link is
 ##  static, the library name must be enclosed by '[..].
-##  Here are some examples allowed: mylib:1.2.0 thelib:1 [staticlib] [commonlib:2.1]
+##  If the dependency concerns only header files, its name must be preceded by
+##  the '@' character.
+##  Here are some examples allowed: mylib:1.2.0 thelib:1 [staticlib]
+##  [commonlib:2.1] @header_only
 ##
 DEPENDENCIES := common
 
@@ -699,46 +704,56 @@ define display_message
 	echo $(COLOR)$(1)$(END_COLOR);
 endef
 
-# gcc flags generating for include files and libraries
-define find_dependency
-$(eval LIB_NAME := $(strip $(1)));
-$(eval LIB_VERSION :=);
-$(eval CUR_LIB_EXT := $(SHARED_EXT));
 
+# find_headers function
+# Search for headers in the specified workspace directory 
+# -------------------------------------------------------
+define find_headers
+$(eval DEFAULT_DIR := $(WORKSPACE_DIR)/$(1));
+$(if $(or $(wildcard $(DEFAULT_DIR)/*.h*), \
+          $(wildcard $(DEFAULT_DIR)/*/*.h*)), \
+              $(eval INCLUDE += -I$(DEFAULT_DIR)); \
+              $(eval INCLUDE_DIR += $(DEFAULT_DIR)); \
+              $(eval NOT_IN_WORKSPACE =),);
+endef
+# ----------------------------------------------------
+
+
+# find_dependency function
+# gcc flags generating for include files and libraries
+# ----------------------------------------------------
+define find_dependency
+$(eval LIB_NAME := $(strip $(1)));     # Removes spaces
+$(eval LIB_VERSION :=);
+$(eval CUR_LIB_EXT := $(SHARED_EXT));  # Default extension
+$(eval SUFFIX :=);
+$(eval NOT_IN_WORKSPACE = 1);
+$(eval LIB_SEARCH = 1);     # By default, we search library
+
+# For static library, remove '[ ]'
 $(if $(findstring [,$(LIB_NAME)),
     $(eval CUR_LIB_EXT := $(LIB_EXT)); \
     $(eval LIB_NAME := $(subst [,,$(LIB_NAME))); \
     $(eval LIB_NAME := $(subst ],,$(LIB_NAME))),
 ); 
-    
+
+# For specific version, remove ':'    
 $(if $(findstring :,$(LIB_NAME)),
     $(eval LIB_NAME := $(subst :, ,$(LIB_NAME))); \
     $(eval LIB_VERSION := $(lastword $(LIB_NAME))); \
     $(eval LIB_NAME := $(firstword $(LIB_NAME))),
 );
 
-$(eval SUFFIX :=);
-$(eval NOT_IN_WORKSPACE = 1);
+# For headers only, remove '@'    
+$(if $(findstring @,$(LIB_NAME)),
+    $(eval LIB_NAME := $(subst @,,$(LIB_NAME))); \
+    $(eval LIB_SEARCH =),
+);       
 
-$(eval DEFAULT_DIR := $(WORKSPACE_DIR)/$(LIB_NAME)/$(INC_DIR_NAME));
-$(if $(or $(wildcard $(DEFAULT_DIR)/*.h*), \
-          $(wildcard $(DEFAULT_DIR)/*/*.h*)), \
-              $(eval INCLUDE += -I$(DEFAULT_DIR)); \
-              $(eval INCLUDE_DIR += $(DEFAULT_DIR)); \
-              $(eval NOT_IN_WORKSPACE =),);
-
-$(eval DEFAULT_DIR := $(WORKSPACE_DIR)/$(LIB_NAME)/$(SRC_DIR_NAME)/$(INC_DIR_NAME));
-$(if $(wildcard $(DEFAULT_DIR)/*.h*),
-         $(eval INCLUDE += -I$(DEFAULT_DIR)); \
-         $(eval INCLUDE_DIR += $(DEFAULT_DIR)); \
-         $(eval NOT_IN_WORKSPACE =),);
-
-$(eval DEFAULT_DIR := $(WORKSPACE_DIR)/$(LIB_NAME)/$(SRC_DIR_NAME));
-$(if $(or $(wildcard $(DEFAULT_DIR)/*.h*), \
-          $(wildcard $(DEFAULT_DIR)/*/*.h*)), \
-              $(eval INCLUDE += -I$(DEFAULT_DIR)); \
-              $(eval INCLUDE_DIR += $(DEFAULT_DIR)); \
-              $(eval NOT_IN_WORKSPACE =),);
+# Search directories for headers, in the workspace
+$(call find_headers,$(LIB_NAME)/$(INC_DIR_NAME));
+$(call find_headers,$(LIB_NAME)/$(SRC_DIR_NAME)/$(INC_DIR_NAME));
+$(call find_headers,$(LIB_NAME)/$(SRC_DIR_NAME));
 
 $(eval CUR_LIB_PATH = $(WORKSPACE_DIR)/$(LIB_NAME)/$(BIN_DIR_NAME)/$(DEP_CONFIG)_$(TARGET_ARCH));
 $(eval CUR_LIB = $(LIB_PREFIX)$(LIB_NAME));
@@ -746,13 +761,22 @@ $(eval CUR_LIB = $(LIB_PREFIX)$(LIB_NAME));
 $(if $(wildcard $(CUR_LIB_PATH)/*), \
                 $(eval SUFFIX = $(TYPE_SUFFIX)),);
 $(if $(or $(wildcard $(CUR_LIB_PATH)/$(CUR_LIB)$(SUFFIX).$(LIB_EXT)*), \
-          $(wildcard $(CUR_LIB_PATH)/$(CUR_LIB)$(SUFFIX).$(SHARED_EXT)*)), \
-              $(eval LDFLAGS += -L$(CUR_LIB_PATH) -l$(LIB_NAME)$(SUFFIX)); \
-              $(eval DEP_LIB_PATH:=$(DEP_LIB_PATH):$(CUR_LIB_PATH)),);
-$(if $(NOT_IN_WORKSPACE), $(eval LDFLAGS += -l$(LIB_NAME)$(SUFFIX)));
-endef
+          $(wildcard $(CUR_LIB_PATH)/$(CUR_LIB)$(SUFFIX).$(SHARED_EXT)*)
+      ), \
+      $(eval LDFLAGS += -L$(CUR_LIB_PATH) -l$(LIB_NAME)$(SUFFIX)); \
+      $(eval DEP_LIB_PATH:=$(DEP_LIB_PATH):$(CUR_LIB_PATH)),);
 
+# The library exists outside the workspace
+$(if $(and $(NOT_IN_WORKSPACE),$(LIB_SEARCH)), \
+                $(eval LDFLAGS += -l$(LIB_NAME)$(SUFFIX)));
+endef
+# ----------------------------------------------------
+
+# Search all dependencies
 $(foreach lib,$(DEPENDENCIES),$(call find_dependency,$(lib)))
+
+# The include and src directories of the project are still
+# in the search path of the headers.
 $(eval INCLUDE += -I$(SRC_DIR) -I$(INC_DIR));
 
 ifeq (${CONFIG}, Test)
