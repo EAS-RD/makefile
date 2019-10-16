@@ -67,43 +67,43 @@ END_COLOR ?= "\\033[0m"
 ## by this makefile are indicated in this diagram.
 ## <pre>
 ## Workspace
-##     │
-##     ├──────── Project 1
-##     │            ├──────── build
-##     │            │          │
-##     │            │          ├──────── Debug_<arch>
-##     │            │          │
-##     │            │          ├──────── Release_<arch>
-##     │            │          │
-##     │            │          └──────── Test_<arch>
-##     │            │
-##     │            ├──────── include
-##     │            │
-##     │            ├──────── log
-##     │            │
-##     │            ├──────── package
-##     │            │            │
-##     │            │            ├──────── deb
-##     │            │            │
-##     │            │            ├──────── rpm
-##     │            │            │
-##     │            │            ├──────── tar
-##     │            │            │
-##     │            │            ├──────── ...
-##     │            │            │
-##     │            │            └──────── zip
-##     │            │
-##     │            │
-##     │            ├──────── src
-##     │            │
-##     │            └──────── test
-##     │
-##     │
-##     ├──────── Project 2
+##     :
+##     :-------- Project 1
+##     :            :-------- build
+##     :            :          :
+##     :            :          :-------- Debug_<arch>
+##     :            :          :
+##     :            :          :-------- Release_<arch>
+##     :            :          :
+##     :            :          :-------- Test_<arch>
+##     :            :
+##     :            :-------- include
+##     :            :
+##     :            :-------- log
+##     :            :
+##     :            :-------- package
+##     :            :            :
+##     :            :            :-------- deb
+##     :            :            :
+##     :            :            :-------- rpm
+##     :            :            :
+##     :            :            :-------- tar
+##     :            :            :
+##     :            :            :-------- ...
+##     :            :            :
+##     :            :            :-------- zip
+##     :            :
+##     :            :
+##     :            :-------- src
+##     :            :
+##     :            :-------- test
 ##     :
 ##     :
-##     │
-##     └──────── Project n
+##     :-------- Project 2
+##     :
+##     :
+##     :
+##     :-------- Project n
 ## </pre>
 ## \subsection dir_content Directories contents
 ##
@@ -704,7 +704,6 @@ endif
 define display_message
 	echo $(COLOR)$(1)$(END_COLOR);
 endef
-
 
 # find_headers function
 # Search for headers in the specified workspace directory 
