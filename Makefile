@@ -23,7 +23,7 @@
 ##              directory architecture.
 ##
 ## @author      Tuxin (JPB)
-## @version     1.4.3
+## @version     1.4.4
 ## @since       Created 04/25/2018 (JPB)
 ## @since       Modified 10/15/2018 (JPB) - Add 'dependencies' rule.
 ## @since       Modified 10/19/2018 (JPB) - The version number and the type
@@ -40,9 +40,11 @@
 ## @since       Modified 10/18/2019 (JPB) - Fixed transmission of environment
 ##                                          variables (among others, BOARD_TYPE)
 ##                                          to the compiler.
-##                                        - Adds gcov options
+##                                        - Adds gcov options.
+## @since       Modified 11/05/2019 (JPB) - Adds CppUTest options for memory
+##                                          leaks detection.
 ##
-## @date        October 18, 2019
+## @date        November 5, 2019
 ##
 ## *****************************************************************************
 .DEFAULT_GOAL = without_target
@@ -650,7 +652,9 @@ CXXFLAGS ?= $(COMPIL_FLAGS)
 LDFLAGS ?= $(COMMON_FLAGS) -Xlinker --gc-sections -Wl,-Map,"$(LOG_DIR)/$(PROJECT_NAME)$(TYPE_SUFFIX)-$(VERSION).map"
 ifeq (${CONFIG}, Test)
   CFLAGS +=-fprofile-arcs -ftest-coverage 
+  CFLAGS += -include CppUTest/MemoryLeakDetectorMallocMacros.h
   CXXFLAGS +=-fprofile-arcs -ftest-coverage
+  CXXFLAGS += -include CppUTest/MemoryLeakDetectorNewMacros.h
   LDFLAGS += -fprofile-arcs
 endif
 
