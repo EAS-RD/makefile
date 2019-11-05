@@ -23,7 +23,7 @@
 ##              directory architecture.
 ##
 ## @author      Tuxin (JPB)
-## @version     1.4.2
+## @version     1.4.3
 ## @since       Created 04/25/2018 (JPB)
 ## @since       Modified 10/15/2018 (JPB) - Add 'dependencies' rule.
 ## @since       Modified 10/19/2018 (JPB) - The version number and the type
@@ -37,8 +37,12 @@
 ## @since       Modified 05/09/2019 (JPB) - We can specify that a dependency
 ##                                          can only have header files.
 ## @since       Modified 07/26/2019 (JPB) - Fixed text search in variables.
+## @since       Modified 10/18/2019 (JPB) - Fixed transmission of environment
+##                                          variables (among others, BOARD_TYPE)
+##                                          to the compiler.
+##                                        - Adds gcov options
 ##
-## @date        July 26, 2019
+## @date        October 18, 2019
 ##
 ## *****************************************************************************
 .DEFAULT_GOAL = without_target
@@ -229,6 +233,12 @@ endif
 ##  preprocessor.
 ##
 PRE_DEFINED = -DVERSION=$(VERSION) -DREVISION=$(REV_NUMBER)
+
+# BOARD_TYPE is used to define the electronic card used.
+ifneq ($(BOARD_TYPE),)
+  PRE_DEFINED += -DBOARD_TYPE=$(BOARD_TYPE)
+endif 
+ 
 ifeq ($(CONFIG),Debug)
   PRE_DEFINED += -D_DEBUG
 endif
@@ -368,6 +378,11 @@ LOG_DIR_NAME := log
 ## \brief Sets directory name where testing source files are stored
 ##
 TEST_DIR_NAME := test
+
+## \def TEST_RC_DIR_NAME
+## \brief Sets directory name where testing ressources files are stored
+##
+TEST_RC_DIR_NAME := rc
 
 ## \def PROJECT_DIR
 ## \brief Reads actual directory corresponding to project name
@@ -612,7 +627,7 @@ COMMON_FLAGS = -fmessage-length=0 -fsigned-char -ffunction-sections -fdata-secti
 ## \def COMPIL_FLAGS
 ## \brief Defines the C and C++ common compilation flags
 ##
-COMPIL_FLAGS = $(COMMON_FLAGS) $(PRE_DEFINED) -ansi -pedantic
+COMPIL_FLAGS = $(COMMON_FLAGS) -ansi -pedantic
 ifeq (${CONFIG}, Test)
   COMPIL_FLAGS += -fprofile-arcs -ftest-coverage
 endif
@@ -621,19 +636,21 @@ endif
 ## \brief Defines the C compilation flags
 ##
 CFLAGS ?= $(COMPIL_FLAGS)
- CFLAGS += -std=gnu11
+ CFLAGS += -std=gnu11 $(PRE_DEFINED) 
 
 ## \def CXXFLAGS
 ## \brief Defines the C++ compilation flags
 ##
 CXXFLAGS ?= $(COMPIL_FLAGS)
- CXXFLAGS += -std=gnu++11
-
+ CXXFLAGS += -std=gnu++11 $(PRE_DEFINED) 
+ 
 ## \def LDFLAGS
 ## \brief Defines the linker flags
 ##
 LDFLAGS ?= $(COMMON_FLAGS) -Xlinker --gc-sections -Wl,-Map,"$(LOG_DIR)/$(PROJECT_NAME)$(TYPE_SUFFIX)-$(VERSION).map"
 ifeq (${CONFIG}, Test)
+  CFLAGS +=-fprofile-arcs -ftest-coverage 
+  CXXFLAGS +=-fprofile-arcs -ftest-coverage
   LDFLAGS += -fprofile-arcs
 endif
 
@@ -956,6 +973,10 @@ ifeq ($(MAKECMDGOALS),all)
   $(shell for i in ${SRC_SUBDIR} ; do mkdir -p $(OBJ_DIR)/$(SRC_DIR_NAME)/$$i ; done)
   $(shell mkdir -p $(OBJ_DIR)/$(TEST_DIR_NAME))
   $(shell mkdir -p $(LOG_DIR))
+
+  # Copy test ressources into test directory
+  $(shell cp -R $(TEST_DIR_NAME)/$(TEST_RC_DIR_NAME)/* $(OBJ_DIR)/)
+
   #  DUMMY_VAR := $(error erreur)
   # Includes dependencies
   -include $(DEP_FILES)
