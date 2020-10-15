@@ -23,7 +23,7 @@
 ##              directory architecture.
 ##
 ## @author      Tuxin (JPB)
-## @version     1.4.5
+## @version     1.4.6
 ## @since       Created 04/25/2018 (JPB)
 ## @since       Modified 10/15/2018 (JPB) - Add 'dependencies' rule.
 ## @since       Modified 10/19/2018 (JPB) - The version number and the type
@@ -44,8 +44,9 @@
 ## @since       Modified 11/05/2019 (JPB) - Adds CppUTest options for memory
 ##                                          leaks detection.
 ## @since       Modified 09/01/2020 (JPB) - Fixes ar parameters for static lib
+## @since       Modified 10/15/2020 (JPB) - Fixes VERSION define 
 ##
-## @date        September 1, 2020
+## @date        October 15, 2020
 ##
 ## *****************************************************************************
 .DEFAULT_GOAL = without_target
@@ -235,7 +236,7 @@ endif
 ## \brief Stores predefined variables. These variables are passed to the
 ##  preprocessor.
 ##
-PRE_DEFINED = -DVERSION=$(VERSION) -DREVISION=$(REV_NUMBER)
+PRE_DEFINED = -DVERSION=\"$(VERSION)\" -DREVISION=$(REV_NUMBER)
 
 # BOARD_TYPE is used to define the electronic card used.
 ifneq ($(BOARD_TYPE),)
