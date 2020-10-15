@@ -23,7 +23,7 @@
 ##              directory architecture.
 ##
 ## @author      Tuxin (JPB)
-## @version     1.4.4
+## @version     1.4.5
 ## @since       Created 04/25/2018 (JPB)
 ## @since       Modified 10/15/2018 (JPB) - Add 'dependencies' rule.
 ## @since       Modified 10/19/2018 (JPB) - The version number and the type
@@ -43,8 +43,9 @@
 ##                                        - Adds gcov options.
 ## @since       Modified 11/05/2019 (JPB) - Adds CppUTest options for memory
 ##                                          leaks detection.
+## @since       Modified 09/01/2020 (JPB) - Fixes ar parameters for static lib
 ##
-## @date        November 5, 2019
+## @date        September 1, 2020
 ##
 ## *****************************************************************************
 .DEFAULT_GOAL = without_target
@@ -553,7 +554,7 @@ ifeq ($(origin CC),default)
 ## \def AR
 ## \brief Stores archiver command
 ##
-AR = "$(CROSS_COMPILE)ar -q"
+AR = $(CROSS_COMPILE)ar -rcs
 
 ## \def AS
 ## \brief Stores assembler command
@@ -684,6 +685,12 @@ ifeq (${BINARY_TYPE},shared)
   ifeq ($(findstring Linux,${OS_TYPE}), Linux)
     LDFLAGS += -Wl,-soname,$(BINARY_NAME).$(SHARED_EXT).$(MAJ_VERSION)
   endif
+endif
+
+ifeq (${BINARY_TYPE},lib)
+  CFLAGS += -fPIC
+  CXXFLAGS += -fPIC
+  LDFLAGS += -fPIC
 endif
 
 ifeq (${CONFIG}, Release)
@@ -993,3 +1000,4 @@ endif
 
 ##
 ## @}
+
