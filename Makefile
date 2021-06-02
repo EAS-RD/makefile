@@ -23,7 +23,7 @@
 ##              directory architecture.
 ##
 ## @author      Tuxin (JPB)
-## @version     1.4.6
+## @version     1.4.7
 ## @since       Created 04/25/2018 (JPB)
 ## @since       Modified 10/15/2018 (JPB) - Add 'dependencies' rule.
 ## @since       Modified 10/19/2018 (JPB) - The version number and the type
@@ -44,9 +44,10 @@
 ## @since       Modified 11/05/2019 (JPB) - Adds CppUTest options for memory
 ##                                          leaks detection.
 ## @since       Modified 09/01/2020 (JPB) - Fixes ar parameters for static lib
-## @since       Modified 10/15/2020 (JPB) - Fixes VERSION define 
+## @since       Modified 10/15/2020 (JPB) - Fixes VERSION define
+## @since       Modified 06/02/2021 (JPB) - Fixes ar parameters for external SDK 
 ##
-## @date        October 15, 2020
+## @date        June 2nd, 2021
 ##
 ## *****************************************************************************
 .DEFAULT_GOAL = without_target
@@ -611,6 +612,8 @@ OBJDUMP = "$(CROSS_COMPILE)objdump"
 ## \brief Stores xxx command
 ##
 RANLIB = "$(CROSS_COMPILE)ranlib"
+else
+AR = $(AR) -rcs
 endif
 
 ## \def RM
